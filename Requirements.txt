@@ -1,0 +1,11 @@
+# requirements.txt
+# -----------------------------------------------------------------------------
+# This is the "Crafting Table" recipe list for our redstone contraption.
+# Run `pip install -r requirements.txt` (using the .venv Python!) to fetch
+# all the "resources" (libraries) the build needs.
+# -----------------------------------------------------------------------------
+
+fastapi          # The Command Block - powers our backend API
+uvicorn          # The Redstone Power Source - runs the FastAPI server
+requests         # The Resource Farmer's hands - fetches web pages
+beautifulsoup4   # The Sorter - parses HTML to find the items we want

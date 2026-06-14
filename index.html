@@ -1,0 +1,281 @@
+<!--
+=================================================================================
+index.html
+=================================================================================
+THE PLAYER INTERFACE
+
+This is the "screen" the player looks at. It's a single static HTML page
+styled with Tailwind CSS (loaded via CDN, so no build step / npm needed -
+true to the "no extra dependencies" spirit of this build).
+
+How it fits into the system:
+  - main.py (the Command Block) must be running on http://127.0.0.1:8000
+  - This page uses fetch() to call the /search endpoint and render results
+    as "item cards" in the grid below.
+  - CORS middleware in main.py is what allows this page (opened as a local
+    file or from a different port) to "cross dimensions" and talk to the API.
+
+start.bat opens this file automatically after starting the server.
+=================================================================================
+-->
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Course Material Aggregator</title>
+
+    <!-- Tailwind CSS via CDN - "The Resource Pack" -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Tailwind config tweak: enable class-based dark mode (already 'dark' on <html>)
+        tailwind.config = {
+            darkMode: 'class',
+        };
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+
+    <!-- ============================= HEADER ============================= -->
+    <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-10">
+        <div class="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight text-emerald-400">
+                    ⛏️ Course Material Aggregator
+                </h1>
+                <p class="text-sm text-slate-400 mt-1">
+                    Search free OpenStax textbooks, harvested by your Resource Farmer.
+                </p>
+            </div>
+            <span id="api-status" class="text-xs font-mono px-3 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                checking API...
+            </span>
+        </div>
+    </header>
+
+    <!-- ============================= MAIN ================================ -->
+    <main class="max-w-5xl mx-auto px-6 py-8">
+
+        <!-- Search Bar -->
+        <section class="flex flex-col sm:flex-row gap-3 mb-8">
+            <input
+                id="search-input"
+                type="text"
+                placeholder="Search by title or subject (e.g. biology, algebra, statistics)..."
+                class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3
+                       text-slate-100 placeholder-slate-500
+                       focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+            />
+            <select
+                id="subject-filter"
+                class="bg-slate-900 border border-slate-700 rounded-xl px-4 py-3
+                       text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+            >
+                <option value="">All Subjects</option>
+            </select>
+            <button
+                id="search-btn"
+                class="bg-emerald-600 hover:bg-emerald-500 active:scale-95
+                       text-white font-semibold px-6 py-3 rounded-xl transition"
+            >
+                Search
+            </button>
+        </section>
+
+        <!-- Results Info -->
+        <p id="results-info" class="text-sm text-slate-400 mb-4"></p>
+
+        <!-- Results Grid -->
+        <section id="results-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Cards get injected here by JavaScript -->
+        </section>
+
+        <!-- Empty / Error State -->
+        <div id="empty-state" class="hidden text-center py-16 text-slate-500">
+            <p class="text-5xl mb-3">📦</p>
+            <p class="text-lg font-semibold" id="empty-title">No results found</p>
+            <p class="text-sm mt-1" id="empty-message">Try a different search term.</p>
+        </div>
+    </main>
+
+    <!-- ============================= FOOTER ============================== -->
+    <footer class="text-center text-xs text-slate-600 py-6 border-t border-slate-900">
+        Powered by FastAPI &amp; SQLite — running locally on
+        <code class="text-slate-400">http://127.0.0.1:8000</code>
+    </footer>
+
+    <!-- ============================= SCRIPT ============================== -->
+    <script>
+        // -----------------------------------------------------------------------
+        // CONFIGURATION
+        // -----------------------------------------------------------------------
+        const API_BASE = "http://127.0.0.1:8000";
+
+        // -----------------------------------------------------------------------
+        // ELEMENT REFERENCES
+        // -----------------------------------------------------------------------
+        const searchInput = document.getElementById("search-input");
+        const subjectFilter = document.getElementById("subject-filter");
+        const searchBtn = document.getElementById("search-btn");
+        const resultsGrid = document.getElementById("results-grid");
+        const resultsInfo = document.getElementById("results-info");
+        const emptyState = document.getElementById("empty-state");
+        const emptyTitle = document.getElementById("empty-title");
+        const emptyMessage = document.getElementById("empty-message");
+        const apiStatus = document.getElementById("api-status");
+
+        // -----------------------------------------------------------------------
+        // HELPER: Render a single book as a "card"
+        // -----------------------------------------------------------------------
+        function renderCard(book) {
+            const card = document.createElement("a");
+            card.href = book.url;
+            card.target = "_blank";
+            card.rel = "noopener noreferrer";
+            card.className = `
+                block bg-slate-900 border border-slate-800 rounded-xl p-4
+                hover:border-emerald-500 hover:shadow-lg hover:shadow-emerald-500/10
+                transition group
+            `;
+
+            card.innerHTML = `
+                <div class="flex items-start justify-between mb-2">
+                    <span class="text-xs font-mono uppercase tracking-wide text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-md">
+                        ${book.subject ?? "General"}
+                    </span>
+                    <span class="text-slate-500 group-hover:text-emerald-400 transition">↗</span>
+                </div>
+                <h3 class="text-base font-semibold text-slate-100 leading-snug">
+                    ${book.title}
+                </h3>
+                <p class="text-xs text-slate-500 mt-2 truncate">${book.url}</p>
+            `;
+            return card;
+        }
+
+        // -----------------------------------------------------------------------
+        // HELPER: Show the empty/error panel with a custom message
+        // -----------------------------------------------------------------------
+        function showEmptyState(title, message) {
+            resultsGrid.innerHTML = "";
+            emptyTitle.textContent = title;
+            emptyMessage.textContent = message;
+            emptyState.classList.remove("hidden");
+        }
+
+        function hideEmptyState() {
+            emptyState.classList.add("hidden");
+        }
+
+        // -----------------------------------------------------------------------
+        // CORE: Fetch search results from the API
+        // -----------------------------------------------------------------------
+        async function performSearch() {
+            const query = searchInput.value.trim();
+            const subject = subjectFilter.value;
+
+            resultsInfo.textContent = "Searching the chest...";
+            resultsGrid.innerHTML = "";
+            hideEmptyState();
+
+            try {
+                const params = new URLSearchParams();
+                if (query) params.append("q", query);
+                if (subject) params.append("subject", subject);
+
+                const response = await fetch(`${API_BASE}/search?${params.toString()}`);
+
+                if (!response.ok) {
+                    throw new Error(`Server responded with status ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.status === "error") {
+                    resultsInfo.textContent = "";
+                    showEmptyState("Database not ready", data.message);
+                    return;
+                }
+
+                if (!data.results || data.results.length === 0) {
+                    resultsInfo.textContent = "";
+                    showEmptyState(
+                        "No results found",
+                        "Try a different search term, or run scraper.py to harvest more books."
+                    );
+                    return;
+                }
+
+                resultsInfo.textContent = `Found ${data.count} result${data.count === 1 ? "" : "s"}.`;
+                data.results.forEach((book) => resultsGrid.appendChild(renderCard(book)));
+
+            } catch (error) {
+                // Friendly, human-readable error - no scary stack traces for the player.
+                resultsInfo.textContent = "";
+                showEmptyState(
+                    "Couldn't reach the Command Block",
+                    "Make sure the FastAPI server is running (start.bat) at " + API_BASE + ". Details: " + error.message
+                );
+            }
+        }
+
+        // -----------------------------------------------------------------------
+        // CORE: Load the list of subjects for the dropdown filter
+        // -----------------------------------------------------------------------
+        async function loadSubjects() {
+            try {
+                const response = await fetch(`${API_BASE}/subjects`);
+                const data = await response.json();
+
+                if (data.status === "ok" && Array.isArray(data.subjects)) {
+                    data.subjects.forEach((subject) => {
+                        const option = document.createElement("option");
+                        option.value = subject;
+                        option.textContent = subject;
+                        subjectFilter.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                // Non-critical - the search will still work without the dropdown.
+                console.warn("Could not load subjects:", error.message);
+            }
+        }
+
+        // -----------------------------------------------------------------------
+        // CORE: Check API health on page load (powers the status pill top-right)
+        // -----------------------------------------------------------------------
+        async function checkApiStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/`);
+                if (response.ok) {
+                    apiStatus.textContent = "● API Online";
+                    apiStatus.className =
+                        "text-xs font-mono px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-700";
+                } else {
+                    throw new Error("Bad response");
+                }
+            } catch {
+                apiStatus.textContent = "● API Offline";
+                apiStatus.className =
+                    "text-xs font-mono px-3 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-700";
+            }
+        }
+
+        // -----------------------------------------------------------------------
+        // EVENT WIRING (The Redstone Wires connecting buttons to actions)
+        // -----------------------------------------------------------------------
+        searchBtn.addEventListener("click", performSearch);
+        searchInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") performSearch();
+        });
+        subjectFilter.addEventListener("change", performSearch);
+
+        // -----------------------------------------------------------------------
+        // INITIAL LOAD
+        // -----------------------------------------------------------------------
+        checkApiStatus();
+        loadSubjects();
+        performSearch(); // Show all books on first load
+    </script>
+</body>
+</html>
