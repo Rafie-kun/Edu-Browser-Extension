@@ -1,21 +1,14 @@
 <!--
 =================================================================================
-index.html
+index.html - ENHANCED VERSION
 =================================================================================
-THE PLAYER INTERFACE
-
-This is the "screen" the player looks at. It's a single static HTML page
-styled with Tailwind CSS (loaded via CDN, so no build step / npm needed -
-true to the "no extra dependencies" spirit of this build).
-
-How it fits into the system:
-  - main.py (the Command Block) must be running on http://127.0.0.1:8000
-  - This page uses fetch() to call the /search endpoint and render results
-    as "item cards" in the grid below.
-  - CORS middleware in main.py is what allows this page (opened as a local
-    file or from a different port) to "cross dimensions" and talk to the API.
-
-start.bat opens this file automatically after starting the server.
+Better UI with improved styling, animations, and user experience
+- Modern gradient accents
+- Smooth animations and transitions
+- Better visual hierarchy
+- Improved card design with icons
+- Loading states
+- Better accessibility
 =================================================================================
 -->
 <!DOCTYPE html>
@@ -23,100 +16,208 @@ start.bat opens this file automatically after starting the server.
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="description" content="Search free OpenStax textbooks" />
     <title>Course Material Aggregator</title>
 
-    <!-- Tailwind CSS via CDN - "The Resource Pack" -->
+    <!-- Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        // Tailwind config tweak: enable class-based dark mode (already 'dark' on <html>)
         tailwind.config = {
             darkMode: 'class',
         };
     </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Smooth animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 40px rgba(16, 185, 129, 0.5);
+            }
+        }
+
+        @keyframes spin-slow {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .card-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        .loading-spinner {
+            animation: spin-slow 1s linear infinite;
+        }
+
+        .glow-active {
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+
+        /* Gradient background for header */
+        .header-gradient {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(14, 165, 233, 0.1) 100%);
+        }
+
+        /* Glass effect */
+        .glass-effect {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Card hover effect */
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card-hover:hover {
+            transform: translateY(-4px);
+            border-color: rgb(16, 185, 129);
+        }
+
+        /* Smooth search input focus */
+        .search-input-focus:focus {
+            border-color: rgb(16, 185, 129);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+    </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
 
     <!-- ============================= HEADER ============================= -->
-    <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-10">
-        <div class="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold tracking-tight text-emerald-400">
-                    ⛏️ Course Material Aggregator
-                </h1>
-                <p class="text-sm text-slate-400 mt-1">
-                    Search free OpenStax textbooks, harvested by your Resource Farmer.
-                </p>
+    <header class="header-gradient border-b border-slate-800/50 sticky top-0 z-10">
+        <div class="max-w-6xl mx-auto px-6 py-8">
+            <div class="flex items-center justify-between gap-4">
+                <div>
+                    <h1 class="text-4xl font-bold tracking-tight bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                        ⛏️ Course Material Aggregator
+                    </h1>
+                    <p class="text-sm text-slate-400 mt-2">
+                        Discover free OpenStax textbooks instantly
+                    </p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="api-status" class="text-xs font-mono px-4 py-2 rounded-full bg-slate-800/50 text-slate-400 border border-slate-700/50 flex items-center gap-2">
+                        <span class="inline-block w-2 h-2 rounded-full bg-slate-500"></span>
+                        <span>Checking...</span>
+                    </span>
+                </div>
             </div>
-            <span id="api-status" class="text-xs font-mono px-3 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
-                checking API...
-            </span>
         </div>
     </header>
 
     <!-- ============================= MAIN ================================ -->
-    <main class="max-w-5xl mx-auto px-6 py-8">
+    <main class="max-w-6xl mx-auto px-6 py-10">
 
-        <!-- Search Bar -->
-        <section class="flex flex-col sm:flex-row gap-3 mb-8">
-            <input
-                id="search-input"
-                type="text"
-                placeholder="Search by title or subject (e.g. biology, algebra, statistics)..."
-                class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3
-                       text-slate-100 placeholder-slate-500
-                       focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
-            />
-            <select
-                id="subject-filter"
-                class="bg-slate-900 border border-slate-700 rounded-xl px-4 py-3
-                       text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
-            >
-                <option value="">All Subjects</option>
-            </select>
-            <button
-                id="search-btn"
-                class="bg-emerald-600 hover:bg-emerald-500 active:scale-95
-                       text-white font-semibold px-6 py-3 rounded-xl transition"
-            >
-                Search
-            </button>
+        <!-- Search Section -->
+        <section class="mb-10">
+            <div class="glass-effect rounded-2xl p-6 border border-slate-700/50">
+                <div class="flex flex-col gap-4">
+                    <!-- Search Input -->
+                    <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
+                        <input
+                            id="search-input"
+                            type="text"
+                            placeholder="Search by title or subject... (e.g. biology, algebra)"
+                            aria-label="Search textbooks"
+                            class="search-input-focus w-full bg-slate-900/50 border border-slate-700 rounded-xl pl-12 pr-4 py-3.5
+                                   text-slate-100 placeholder-slate-500
+                                   focus:outline-none transition"
+                        />
+                    </div>
+
+                    <!-- Filters & Button -->
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <select
+                            id="subject-filter"
+                            aria-label="Filter by subject"
+                            class="flex-1 bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 pl-4
+                                   text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition cursor-pointer"
+                        >
+                            <option value="">📚 All Subjects</option>
+                        </select>
+                        <button
+                            id="search-btn"
+                            aria-label="Search for textbooks"
+                            class="bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 
+                                   text-white font-semibold px-8 py-3 rounded-xl transition-all
+                                   active:scale-95 shadow-lg hover:shadow-emerald-500/25"
+                        >
+                            <span id="search-btn-text">Search</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- Results Info -->
-        <p id="results-info" class="text-sm text-slate-400 mb-4"></p>
+        <div id="results-info" class="text-sm text-slate-400 mb-6 flex items-center gap-2 h-6">
+            <!-- Dynamic content inserted here -->
+        </div>
 
         <!-- Results Grid -->
-        <section id="results-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <section id="results-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             <!-- Cards get injected here by JavaScript -->
         </section>
 
         <!-- Empty / Error State -->
-        <div id="empty-state" class="hidden text-center py-16 text-slate-500">
-            <p class="text-5xl mb-3">📦</p>
-            <p class="text-lg font-semibold" id="empty-title">No results found</p>
-            <p class="text-sm mt-1" id="empty-message">Try a different search term.</p>
+        <div id="empty-state" class="hidden">
+            <div class="text-center py-24 text-slate-500">
+                <div class="text-6xl mb-4 inline-block">📦</div>
+                <p class="text-2xl font-semibold text-slate-300 mb-2" id="empty-title">No results found</p>
+                <p class="text-base text-slate-400" id="empty-message">Try a different search term.</p>
+                <button 
+                    id="retry-btn"
+                    onclick="performSearch()"
+                    class="mt-6 px-6 py-2 bg-emerald-600/20 border border-emerald-500/50 rounded-lg 
+                           text-emerald-400 hover:bg-emerald-600/30 transition cursor-pointer text-sm font-medium"
+                >
+                    Try Again
+                </button>
+            </div>
         </div>
     </main>
 
     <!-- ============================= FOOTER ============================== -->
-    <footer class="text-center text-xs text-slate-600 py-6 border-t border-slate-900">
-        Powered by FastAPI &amp; SQLite — running locally on
-        <code class="text-slate-400">http://127.0.0.1:8000</code>
+    <footer class="text-center text-xs text-slate-600 py-8 border-t border-slate-900/50 mt-10">
+        <p>Powered by <span class="text-slate-400">FastAPI</span> &amp; <span class="text-slate-400">SQLite</span></p>
+        <p class="mt-1">Running locally on <code class="text-slate-400 font-mono">http://127.0.0.1:8000</code></p>
     </footer>
 
     <!-- ============================= SCRIPT ============================== -->
     <script>
-        // -----------------------------------------------------------------------
-        // CONFIGURATION
-        // -----------------------------------------------------------------------
         const API_BASE = "http://127.0.0.1:8000";
+        let searchTimeout;
 
-        // -----------------------------------------------------------------------
-        // ELEMENT REFERENCES
-        // -----------------------------------------------------------------------
         const searchInput = document.getElementById("search-input");
         const subjectFilter = document.getElementById("subject-filter");
         const searchBtn = document.getElementById("search-btn");
+        const searchBtnText = document.getElementById("search-btn-text");
         const resultsGrid = document.getElementById("results-grid");
         const resultsInfo = document.getElementById("results-info");
         const emptyState = document.getElementById("empty-state");
@@ -124,39 +225,63 @@ start.bat opens this file automatically after starting the server.
         const emptyMessage = document.getElementById("empty-message");
         const apiStatus = document.getElementById("api-status");
 
-        // -----------------------------------------------------------------------
-        // HELPER: Render a single book as a "card"
-        // -----------------------------------------------------------------------
-        function renderCard(book) {
+        // Subject categories with emoji
+        const subjectEmoji = {
+            "Math": "🔢",
+            "Science": "🧪",
+            "Business": "💼",
+            "Social Science": "🤝",
+            "Computer Science": "💻",
+            "Biology": "🧬",
+            "Chemistry": "⚗️",
+            "Physics": "⚛️",
+            "General": "📖",
+        };
+
+        function getSubjectEmoji(subject) {
+            if (!subject) return "📖";
+            for (const [key, emoji] of Object.entries(subjectEmoji)) {
+                if (subject.toLowerCase().includes(key.toLowerCase())) {
+                    return emoji;
+                }
+            }
+            return "📖";
+        }
+
+        function renderCard(book, index) {
             const card = document.createElement("a");
             card.href = book.url;
             card.target = "_blank";
             card.rel = "noopener noreferrer";
+            card.style.animationDelay = `${index * 50}ms`;
             card.className = `
-                block bg-slate-900 border border-slate-800 rounded-xl p-4
-                hover:border-emerald-500 hover:shadow-lg hover:shadow-emerald-500/10
-                transition group
+                card-fade-in card-hover
+                block bg-slate-900/40 border border-slate-700/50 rounded-xl p-5
+                backdrop-blur-sm hover:bg-slate-900/60
+                group cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-950
             `;
 
+            const emoji = getSubjectEmoji(book.subject);
+
             card.innerHTML = `
-                <div class="flex items-start justify-between mb-2">
-                    <span class="text-xs font-mono uppercase tracking-wide text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-md">
-                        ${book.subject ?? "General"}
+                <div class="flex items-start justify-between gap-3 mb-3">
+                    <span class="text-xs font-mono uppercase tracking-wide text-emerald-400 bg-emerald-500/15 px-3 py-1.5 rounded-lg border border-emerald-500/30 flex-shrink-0">
+                        ${emoji} ${book.subject ?? "General"}
                     </span>
-                    <span class="text-slate-500 group-hover:text-emerald-400 transition">↗</span>
+                    <span class="text-slate-500 group-hover:text-emerald-400 transition text-lg flex-shrink-0">↗</span>
                 </div>
-                <h3 class="text-base font-semibold text-slate-100 leading-snug">
+                <h3 class="text-sm font-semibold text-slate-100 leading-snug group-hover:text-emerald-300 transition line-clamp-3 mb-3">
                     ${book.title}
                 </h3>
-                <p class="text-xs text-slate-500 mt-2 truncate">${book.url}</p>
+                <div class="flex items-center justify-between text-xs text-slate-500">
+                    <span class="truncate">OpenStax</span>
+                    <span class="flex-shrink-0">🔗</span>
+                </div>
             `;
             return card;
         }
 
-        // -----------------------------------------------------------------------
-        // HELPER: Show the empty/error panel with a custom message
-        // -----------------------------------------------------------------------
-        function showEmptyState(title, message) {
+        function showEmptyState(title, message, showRetry = false) {
             resultsGrid.innerHTML = "";
             emptyTitle.textContent = title;
             emptyMessage.textContent = message;
@@ -167,16 +292,15 @@ start.bat opens this file automatically after starting the server.
             emptyState.classList.add("hidden");
         }
 
-        // -----------------------------------------------------------------------
-        // CORE: Fetch search results from the API
-        // -----------------------------------------------------------------------
         async function performSearch() {
             const query = searchInput.value.trim();
             const subject = subjectFilter.value;
 
-            resultsInfo.textContent = "Searching the chest...";
+            resultsInfo.innerHTML = '<span class="loading-spinner inline-block">⚙️</span> <span>Searching...</span>';
             resultsGrid.innerHTML = "";
             hideEmptyState();
+            searchBtn.disabled = true;
+            searchBtnText.textContent = "Searching...";
 
             try {
                 const params = new URLSearchParams();
@@ -192,36 +316,45 @@ start.bat opens this file automatically after starting the server.
                 const data = await response.json();
 
                 if (data.status === "error") {
-                    resultsInfo.textContent = "";
-                    showEmptyState("Database not ready", data.message);
+                    resultsInfo.innerHTML = "";
+                    showEmptyState("⚠️ Database not ready", data.message, true);
+                    searchBtn.disabled = false;
+                    searchBtnText.textContent = "Search";
                     return;
                 }
 
                 if (!data.results || data.results.length === 0) {
-                    resultsInfo.textContent = "";
+                    resultsInfo.innerHTML = "";
                     showEmptyState(
                         "No results found",
-                        "Try a different search term, or run scraper.py to harvest more books."
+                        "Try a different search term or filter",
+                        true
                     );
+                    searchBtn.disabled = false;
+                    searchBtnText.textContent = "Search";
                     return;
                 }
 
-                resultsInfo.textContent = `Found ${data.count} result${data.count === 1 ? "" : "s"}.`;
-                data.results.forEach((book) => resultsGrid.appendChild(renderCard(book)));
+                resultsInfo.innerHTML = `✅ Found <strong class="text-emerald-400">${data.count}</strong> result${data.count === 1 ? "" : "s"}`;
+                data.results.forEach((book, index) => {
+                    resultsGrid.appendChild(renderCard(book, index));
+                });
+
+                searchBtn.disabled = false;
+                searchBtnText.textContent = "Search";
 
             } catch (error) {
-                // Friendly, human-readable error - no scary stack traces for the player.
-                resultsInfo.textContent = "";
+                resultsInfo.innerHTML = "";
                 showEmptyState(
-                    "Couldn't reach the Command Block",
-                    "Make sure the FastAPI server is running (start.bat) at " + API_BASE + ". Details: " + error.message
+                    "🔌 API Connection Error",
+                    `Can't reach the server at ${API_BASE}. Make sure start.bat is running.`,
+                    true
                 );
+                searchBtn.disabled = false;
+                searchBtnText.textContent = "Search";
             }
         }
 
-        // -----------------------------------------------------------------------
-        // CORE: Load the list of subjects for the dropdown filter
-        // -----------------------------------------------------------------------
         async function loadSubjects() {
             try {
                 const response = await fetch(`${API_BASE}/subjects`);
@@ -231,51 +364,67 @@ start.bat opens this file automatically after starting the server.
                     data.subjects.forEach((subject) => {
                         const option = document.createElement("option");
                         option.value = subject;
-                        option.textContent = subject;
+                        option.textContent = `${getSubjectEmoji(subject)} ${subject}`;
                         subjectFilter.appendChild(option);
                     });
                 }
             } catch (error) {
-                // Non-critical - the search will still work without the dropdown.
                 console.warn("Could not load subjects:", error.message);
             }
         }
 
-        // -----------------------------------------------------------------------
-        // CORE: Check API health on page load (powers the status pill top-right)
-        // -----------------------------------------------------------------------
         async function checkApiStatus() {
             try {
                 const response = await fetch(`${API_BASE}/`);
                 if (response.ok) {
-                    apiStatus.textContent = "● API Online";
-                    apiStatus.className =
-                        "text-xs font-mono px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-700";
+                    apiStatus.innerHTML = `
+                        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 glow-active"></span>
+                        <span>API Online</span>
+                    `;
+                    apiStatus.className = "text-xs font-mono px-4 py-2 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-700/50 flex items-center gap-2";
                 } else {
                     throw new Error("Bad response");
                 }
             } catch {
-                apiStatus.textContent = "● API Offline";
-                apiStatus.className =
-                    "text-xs font-mono px-3 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-700";
+                apiStatus.innerHTML = `
+                    <span class="inline-block w-2 h-2 rounded-full bg-red-500"></span>
+                    <span>API Offline</span>
+                `;
+                apiStatus.className = "text-xs font-mono px-4 py-2 rounded-full bg-red-500/10 text-red-400 border border-red-700/50 flex items-center gap-2";
             }
         }
 
-        // -----------------------------------------------------------------------
-        // EVENT WIRING (The Redstone Wires connecting buttons to actions)
-        // -----------------------------------------------------------------------
+        // Debounce search input for better performance
+        function debounce(fn, delay) {
+            return function(...args) {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => fn(...args), delay);
+            };
+        }
+
         searchBtn.addEventListener("click", performSearch);
         searchInput.addEventListener("keydown", (e) => {
             if (e.key === "Enter") performSearch();
         });
+        searchInput.addEventListener("input", debounce(() => {
+            if (searchInput.value.length > 2) {
+                performSearch();
+            }
+        }, 600));
         subjectFilter.addEventListener("change", performSearch);
 
-        // -----------------------------------------------------------------------
-        // INITIAL LOAD
-        // -----------------------------------------------------------------------
+        // Keyboard shortcut: Ctrl/Cmd + / to focus search
+        document.addEventListener("keydown", (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === "/") {
+                e.preventDefault();
+                searchInput.focus();
+            }
+        });
+
+        // Initial load
         checkApiStatus();
         loadSubjects();
-        performSearch(); // Show all books on first load
+        performSearch();
     </script>
 </body>
 </html>
